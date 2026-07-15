@@ -1,0 +1,51 @@
+name: local_smoke
+output_dir: runs
+
+data:
+  train_dir: ../tiny_preprocessed_train
+  val_dir: ../tiny_preprocessed_train
+  test_dir: null
+  sample_rate: 16000
+  n_fft: 2048
+  hop_length: 512
+  chunk_samples: 64000
+  cache_tracks: 1
+  gain_augmentation_db: 0.0
+  allow_mixture_phase_targets: true
+
+model:
+  num_bands: 8
+  dim: 32
+  depth: 1
+  heads: 4
+  ff_mult: 2
+  dropout: 0.0
+  mask_scale: 2.0
+  mixture_consistency: true
+
+loss:
+  complex_l1: 1.0
+  log_magnitude: 0.1
+  spectral_convergence: 0.0
+  waveform_l1: 0.0
+  si_sdr: 0.0
+  activity: 0.1
+  mixture_consistency: 0.05
+
+train:
+  epochs: 1
+  batch_size: 1
+  accumulation_steps: 1
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  warmup_steps: 0
+  min_lr_ratio: 0.1
+  grad_clip: 5.0
+  num_workers: 0
+  amp: false
+  seed: 42
+  validate_every: 1
+  save_every: 1
+  early_stopping_patience: 2
+  max_train_batches: 2
+  max_val_batches: 2

@@ -1,0 +1,52 @@
+#!/bin/bash
+#PBS -N audioprism2
+#PBS -q dgx
+#PBS -l select=1:ncpus=12:mem=64gb:ngpus=1
+#PBS -l walltime=24:00:00
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/ml/bin/python}"
+CONFIG="${CONFIG:-configs/base.yaml}"
+RUN_NAME="${RUN_NAME:-bsct_16k_base}"
+OUTPUT_DIR="${OUTPUT_DIR:-$PWD/runs}"
+TRAIN_DIR="${TRAIN_DIR:?Set TRAIN_DIR to the phase-aware preprocessed training dataset}"
+VAL_DIR="${VAL_DIR:?Set VAL_DIR to the phase-aware preprocessed validation dataset}"
+NGPUS="${NGPUS:-1}"
+RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/checkpoints/latest.pt}"
+
+mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs"
+LIVE_LOG="${OUTPUT_DIR}/${RUN_NAME}/logs/pbs_${PBS_JOBID}.log"
+
+echo "Host: $(hostname)" | tee -a "${LIVE_LOG}"
+echo "Started: $(date)" | tee -a "${LIVE_LOG}"
+echo "Python: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+echo "Train data: ${TRAIN_DIR}" | tee -a "${LIVE_LOG}"
+echo "Validation data: ${VAL_DIR}" | tee -a "${LIVE_LOG}"
+nvidia-smi | tee -a "${LIVE_LOG}"
+
+cmd=(
+  "${PYTHON_BIN}" -m torch.distributed.run
+  --standalone
+  --nproc_per_node="${NGPUS}"
+  train.py
+  --config "${CONFIG}"
+  --set "name=${RUN_NAME}"
+  --set "output_dir=${OUTPUT_DIR}"
+  --set "data.train_dir=${TRAIN_DIR}"
+  --set "data.val_dir=${VAL_DIR}"
+)
+
+if [[ -f "${RESUME}" ]]; then
+  cmd+=(--resume "${RESUME}")
+  echo "Resuming: ${RESUME}" | tee -a "${LIVE_LOG}"
+fi
+
+printf 'Command:' | tee -a "${LIVE_LOG}"
+printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
+printf '\n' | tee -a "${LIVE_LOG}"
+"${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
+echo "Finished: $(date)" | tee -a "${LIVE_LOG}"

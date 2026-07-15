@@ -1,0 +1,51 @@
+name: bsct_16k_base
+output_dir: runs
+
+data:
+  train_dir: /path/to/preprocessed_train
+  val_dir: /path/to/preprocessed_val
+  test_dir: /path/to/preprocessed_test
+  sample_rate: 16000
+  n_fft: 2048
+  hop_length: 512
+  chunk_samples: 128000
+  cache_tracks: 2
+  gain_augmentation_db: 6.0
+  allow_mixture_phase_targets: false
+
+model:
+  num_bands: 32
+  dim: 192
+  depth: 8
+  heads: 6
+  ff_mult: 4
+  dropout: 0.1
+  mask_scale: 2.0
+  mixture_consistency: true
+
+loss:
+  complex_l1: 1.0
+  log_magnitude: 0.5
+  spectral_convergence: 0.2
+  waveform_l1: 0.2
+  si_sdr: 0.1
+  activity: 0.1
+  mixture_consistency: 0.05
+
+train:
+  epochs: 200
+  batch_size: 2
+  accumulation_steps: 4
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  warmup_steps: 1000
+  min_lr_ratio: 0.05
+  grad_clip: 5.0
+  num_workers: 4
+  amp: true
+  seed: 42
+  validate_every: 1
+  save_every: 10
+  early_stopping_patience: 30
+  max_train_batches: null
+  max_val_batches: null

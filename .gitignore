@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+runs/
+outputs/
+*.pt
+*.pth
+*.wav
+.pytest_cache/

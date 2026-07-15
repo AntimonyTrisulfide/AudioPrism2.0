@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audioprism-separation"
+version = "2.0.0"
+description = "Complex-domain band-split transformer for music source separation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.2",
+  "torchaudio>=2.2",
+  "PyYAML>=6.0",
+  "numpy>=1.24",
+  "soundfile>=0.12",
+  "scipy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+include = ["audioprism*"]
