@@ -14,7 +14,9 @@ from .runtime import reduce_sum
 
 
 def _autocast(device: torch.device, enabled: bool):
-    return torch.amp.autocast(device_type=device.type, enabled=enabled and device.type == "cuda")
+    if device.type == "cuda":
+        return torch.cuda.amp.autocast(enabled=enabled)
+    return nullcontext()
 
 
 def train_epoch(

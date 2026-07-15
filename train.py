@@ -86,7 +86,7 @@ def main() -> None:
     scheduler = cosine_schedule(
         optimizer, config.train.warmup_steps, steps_per_epoch * config.train.epochs, config.train.min_lr_ratio
     )
-    scaler = torch.amp.GradScaler("cuda", enabled=config.train.amp and device.type == "cuda")
+    scaler = torch.cuda.amp.GradScaler(enabled=config.train.amp and device.type == "cuda")
     start_epoch = 0
     best_si_sdr = float("-inf")
     stale_epochs = 0
