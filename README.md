@@ -119,14 +119,18 @@ cd AudioPrism2
 ENV_NAME=audioprism2 bash scripts/bootstrap_hpc.sh
 ```
 
-Submit the base experiment:
+By default, the PBS job preprocesses train and validation data into its
+job-local `$TMPDIR` and removes that large intermediate data automatically when
+the job ends. Raw audio, split manifests, checkpoints, and logs remain in home.
+This matches clusters that expose `/var/tmp/pbs.*` scratch only on compute
+nodes. Submit the base experiment:
 
 ```bash
-export TRAIN_DIR=/cluster/path/preprocessed_train
-export VAL_DIR=/cluster/path/preprocessed_val
 export OUTPUT_DIR=/cluster/path/audioprism2_runs
 export PYTHON_BIN=$HOME/.conda/envs/audioprism2/bin/python
 export RUN_NAME=bsct_16k_seed42
+export PREPROCESS_PROJECT=$HOME/AudioPrism_HPC
+export PREPROCESS_IN_JOB=1
 bash scripts/submit.sh
 ```
 
@@ -135,6 +139,9 @@ bash scripts/submit.sh
 limits differ. The launcher automatically resumes
 `runs/<name>/checkpoints/latest.pt` when it exists. For a multi-GPU allocation,
 change `ngpus` in the PBS resource line and export `NGPUS` to the same value.
+To reuse persistent preprocessed data instead, set `PREPROCESS_IN_JOB=0` and
+export `TRAIN_DIR` and `VAL_DIR`; submission validates both metadata files
+before requesting a GPU.
 
 Any config value can be overridden without editing YAML:
 

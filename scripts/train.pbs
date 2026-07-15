@@ -13,10 +13,22 @@ PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/ml/bin/python}"
 CONFIG="${CONFIG:-configs/base.yaml}"
 RUN_NAME="${RUN_NAME:-bsct_16k_base}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/runs}"
-TRAIN_DIR="${TRAIN_DIR:?Set TRAIN_DIR to the phase-aware preprocessed training dataset}"
-VAL_DIR="${VAL_DIR:?Set VAL_DIR to the phase-aware preprocessed validation dataset}"
 NGPUS="${NGPUS:-1}"
 RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/checkpoints/latest.pt}"
+PREPROCESS_IN_JOB="${PREPROCESS_IN_JOB:-1}"
+PREPROCESS_PROJECT="${PREPROCESS_PROJECT:-$HOME/AudioPrism_HPC}"
+RAW_DIR="${RAW_DIR:-${PREPROCESS_PROJECT}/data/extracted/V2}"
+SPLIT_DIR="${SPLIT_DIR:-${PREPROCESS_PROJECT}/splits}"
+JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
+
+if [[ "${PREPROCESS_IN_JOB}" == "1" ]]; then
+  PREP_ROOT="${JOB_TMPDIR}/audioprism2_preprocessed"
+  TRAIN_DIR="${PREP_ROOT}/train"
+  VAL_DIR="${PREP_ROOT}/val"
+else
+  TRAIN_DIR="${TRAIN_DIR:?Set TRAIN_DIR when PREPROCESS_IN_JOB=0}"
+  VAL_DIR="${VAL_DIR:?Set VAL_DIR when PREPROCESS_IN_JOB=0}"
+fi
 
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs"
 LIVE_LOG="${OUTPUT_DIR}/${RUN_NAME}/logs/pbs_${PBS_JOBID}.log"
@@ -24,9 +36,46 @@ LIVE_LOG="${OUTPUT_DIR}/${RUN_NAME}/logs/pbs_${PBS_JOBID}.log"
 echo "Host: $(hostname)" | tee -a "${LIVE_LOG}"
 echo "Started: $(date)" | tee -a "${LIVE_LOG}"
 echo "Python: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+echo "PBS scratch: ${JOB_TMPDIR}" | tee -a "${LIVE_LOG}"
 echo "Train data: ${TRAIN_DIR}" | tee -a "${LIVE_LOG}"
 echo "Validation data: ${VAL_DIR}" | tee -a "${LIVE_LOG}"
 nvidia-smi | tee -a "${LIVE_LOG}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+  exit 2
+fi
+
+preprocess_split() {
+  local split_name="$1"
+  local output_path="$2"
+  local split_file="${SPLIT_DIR}/${split_name}.txt"
+  echo "Preprocessing ${split_name} into PBS scratch..." | tee -a "${LIVE_LOG}"
+  "${PYTHON_BIN}" "${PREPROCESS_PROJECT}/scripts/preprocess_dataset.py" \
+    --raw-dir "${RAW_DIR}" \
+    --output-dir "${output_path}" \
+    --split-file "${split_file}" \
+    --chunk-duration 8 \
+    --sample-rate 16000 \
+    --n-fft 2048 \
+    --hop-length 512 2>&1 | tee -a "${LIVE_LOG}"
+}
+
+if [[ "${PREPROCESS_IN_JOB}" == "1" ]]; then
+  mkdir -p "${JOB_TMPDIR}"
+  preprocess_split train "${TRAIN_DIR}"
+  preprocess_split val "${VAL_DIR}"
+fi
+
+for metadata in "${TRAIN_DIR}/dataset_metadata.pt" "${VAL_DIR}/dataset_metadata.pt"; do
+  if [[ ! -f "${metadata}" ]]; then
+    echo "Required dataset metadata was not created: ${metadata}" | tee -a "${LIVE_LOG}"
+    exit 3
+  fi
+done
+
+"${PYTHON_BIN}" inspect_dataset.py "${TRAIN_DIR}" --scan-chunks 2 2>&1 | tee -a "${LIVE_LOG}"
+"${PYTHON_BIN}" inspect_dataset.py "${VAL_DIR}" --scan-chunks 2 2>&1 | tee -a "${LIVE_LOG}"
 
 cmd=(
   "${PYTHON_BIN}" -m torch.distributed.run
